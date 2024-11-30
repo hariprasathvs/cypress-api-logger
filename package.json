@@ -1,0 +1,25 @@
+{
+  "name": "cypress-api-logger",
+  "version": "1.0.0",
+  "description": "Logs API Request and Response in Cypress Test Runner.",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hariprasathvs/cypress-api-logger.git"
+  },
+  "keywords": [
+    "plugin"
+  ],
+  "author": "Hari Prasath VS",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/hariprasathvs/cypress-api-logger/issues"
+  },
+  "homepage": "https://github.com/hariprasathvs/cypress-api-logger#readme",
+  "devDependencies": {
+    "cypress": "^13.16.0"
+  }
+}

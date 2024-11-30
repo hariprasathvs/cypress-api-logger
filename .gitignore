@@ -1,0 +1,4 @@
+node_modules
+cypres/screenshots
+cypress/videos
+cypress/downloads/
