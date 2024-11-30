@@ -42,11 +42,17 @@ describe('API Request Logging', () => {
 - Request Method: GET
 - Request URL: https://jsonplaceholder.typicode.com/posts
 - Response Status: 200
-- Response Body: <Response body content>
+- Response Body: `<Response body content>`
 - Duration: 123ms
 
 ## Configuration
 Currently, the plugin logs all API requests and responses by default. Custom configurations, such as filtering or modifying the log details, can be added in future versions.
+
+1. **Global Configuration**: 
+   Users can set `maxBodyLines` and `displayFields` globally using `Cypress.env('apiLoggerConfig', {...})`. This will apply the configuration across all requests in the project.
+   
+2. **Per-Request Configuration**: 
+   Users can also customize the logging behavior on a per-request basis by passing a `config` object inside the `cy.request()` options.
 
 ## Contributing
 Feel free to contribute to this project! Fork the repository, create a new branch, and submit a pull request with your improvements.
@@ -66,4 +72,4 @@ Author: Hari Prasath VS
 GitHub Repository: https://github.com/hariprasathvs/cypress-api-logger
 
 ## License
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License .

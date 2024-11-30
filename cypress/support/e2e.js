@@ -15,6 +15,9 @@
 
 // Import commands.js using ES2015 syntax:
 import './commands'
-
+Cypress.env('apiLoggerConfig', {
+    //maxBodyLines: 5,  // Limit response body to 5 lines globally
+    displayFields: ['status', 'requestHeaders', 'responseBody']  // Default fields for all requests
+});
 // Alternatively you can use CommonJS syntax:
 // require('./commands')

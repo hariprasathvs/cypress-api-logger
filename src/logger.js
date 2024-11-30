@@ -1,45 +1,62 @@
 /// <reference types="cypress" />
 
-// Function to truncate strings longer than a specified length
-const truncateResponseBody = (body, maxLength = 500) => {
-    // If the body is an object or array, stringify it first
-    const stringifiedBody = typeof body === 'string' ? body : JSON.stringify(body);
+const logRequestDetails = (requestDetails, response, duration, config = {}) => {
 
-    if (stringifiedBody.length > maxLength) {
-        return stringifiedBody.substring(0, maxLength) + '...'; // Truncate and add ellipsis
-    }
-    return stringifiedBody; // Return the body as is if it's shorter than maxLength
-};
+    const defaultConfig = Cypress.env('apiLoggerConfig');
 
-// Create a custom log outside the overwrite function
-const logRequestDetails = (requestDetails, response, duration) => {
+    const {
+        maxBodyLines = defaultConfig.maxBodyLines || 50,
+        displayFields = defaultConfig.displayFields || ['method', 'url', 'status', 'requestBody', 'requestHeaders', 'responseBody', 'responseHeaders', 'duration'] } = config;
+
     const method = requestDetails.method || 'GET';
     const url = typeof requestDetails === 'string' ? requestDetails : requestDetails.url;
     const requestBody = requestDetails.body || null;
     const requestHeaders = requestDetails.headers || {};
+    const truncatedResponseBody = response.body
+        ? JSON.stringify(response.body, null, 2).split('\n').slice(0, maxBodyLines).join('\n')
+        : 'No Response Body';
 
-    // Truncate the response body if it's too large
-    const truncatedResponseBody = truncateResponseBody(response.body);
+    // Build the log message based on the displayFields
+    let logMessage = `--- **LOGGING STARTED FOR** ${method} : ${url} \n`;
 
-    // You can set `$el` to `null` if you don't have a DOM element to associate with
-    const $el = null; // Optional: can be linked to any DOM element, like cy.get('selector').first()
+    if (displayFields.includes('status')) {
+        logMessage += ` | **Status**: ${response.status}\n`;
+    }
 
-    // Create a custom log with Cypress.log
+    if (displayFields.includes('requestHeaders') && requestHeaders) {
+        logMessage += ` | **Request Headers**: ${JSON.stringify(requestHeaders, null, 2)}\n`;
+    }
+
+    if (displayFields.includes('requestBody') && requestBody) {
+        logMessage += ` | **Request Body**: ${JSON.stringify(requestBody, null, 2)}\n`;
+    }
+
+    if (displayFields.includes('responseHeaders') && response.headers) {
+        logMessage += ` | **Response Headers**: ${JSON.stringify(response.headers, null, 2)}\n`;
+    }
+
+    if (displayFields.includes('responseBody') && response.body) {
+        logMessage += ` | **Response Body**: \n${truncatedResponseBody}\n`;
+    }
+
+    if (displayFields.includes('duration') && duration) {
+        logMessage += ` | **duration is**: ${duration}ms\n`;
+    }
+
     Cypress.log({
         name: 'Custom Log',
         displayName: 'LOGGER',
-        message: `
-            **Request Method**: ${method}
-            **Request URL**: ${url}
-            **Request Body**: ${JSON.stringify(requestBody, null, 2)}
-            **Request Headers**: ${JSON.stringify(requestHeaders, null, 2)}
-            **Response Status**: ${response.status}
-            **Response Headers**: ${JSON.stringify(response.headers, null, 2)}
-            **Response Body**: ${truncatedResponseBody}
-            **Duration (ms)**: ${duration}
-        `,
-        $el,  // Optional: can be a specific element if needed (otherwise `null` is fine)
-        consoleProps: () => {}
+        message: logMessage,
+        consoleProps: () => ({
+            'Request Method': method,
+            'Request URL': url,
+            'Request Body': requestBody,
+            'Request Headers': requestHeaders,
+            'Response Status': response.status,
+            'Response Body': truncatedResponseBody,
+            'Response Headers': JSON.stringify(response.headers, null, 2),
+            'Duration (ms)': duration,
+        }),
     });
 };
 
