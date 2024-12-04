@@ -5,8 +5,13 @@ const logRequestDetails = (requestDetails, response, duration, config = {}) => {
     const defaultConfig = Cypress.env('apiLoggerConfig') || {};
 
     const {
+        enableApiLogging = true,
         maxBodyLines = 50,
         displayFields = ['method', 'url', 'status', 'requestBody', 'requestHeaders', 'responseBody', 'responseHeaders', 'duration'] } = { ...defaultConfig, ...config };
+
+    if (!enableApiLogging) {
+        return;
+    }
 
     const method = requestDetails.method || 'GET';
     const url = typeof requestDetails === 'string' ? requestDetails : requestDetails.url;

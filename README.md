@@ -48,8 +48,32 @@ describe('API Request Logging', () => {
 ## Configuration
 Currently, the plugin logs all API requests and responses by default. Custom configurations, such as filtering or modifying the log details, can be added in future versions.
 
-1. **Global Configuration**: 
-   Users can set `maxBodyLines` and `displayFields` globally using `Cypress.env('apiLoggerConfig', {...})`. This will apply the configuration across all requests in the project.
+1. **Global Configuration:**  
+You can set global configurations for the plugin using `Cypress.env('apiLoggerConfig', {...})`. These configurations will apply across all requests in the project.  
+
+    **Default Configuration:**  
+    - **`maxBodyLines`**: `50`  
+  Controls the maximum number of lines displayed for the response body.  
+
+    - **`displayFields`**:  
+  `['method', 'url', 'status', 'requestBody', 'requestHeaders', 'responseBody', 'responseHeaders', 'duration']`  
+  Specifies which fields should be displayed in the logs.  
+
+    - **`enableApiLogging`**: `true`  
+  Toggles API logging. When set to `false`, no logs will be displayed.  
+
+        #### Example Usage:  
+
+        To customize the configuration, add the following to your Cypress test or environment file:  
+
+        ```javascript
+        Cypress.env('apiLoggerConfig', {
+          maxBodyLines: 100,
+          displayFields: ['method', 'url', 'status'],
+          enableApiLogging: false,
+        });
+        ```
+
    
 2. **Per-Request Configuration**: 
    Users can also customize the logging behavior on a per-request basis by passing a `config` object inside the `cy.request()` options.
