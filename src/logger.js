@@ -2,11 +2,11 @@
 
 const logRequestDetails = (requestDetails, response, duration, config = {}) => {
 
-    const defaultConfig = Cypress.env('apiLoggerConfig');
+    const defaultConfig = Cypress.env('apiLoggerConfig') || {};
 
     const {
-        maxBodyLines = defaultConfig.maxBodyLines || 50,
-        displayFields = defaultConfig.displayFields || ['method', 'url', 'status', 'requestBody', 'requestHeaders', 'responseBody', 'responseHeaders', 'duration'] } = config;
+        maxBodyLines = 50,
+        displayFields = ['method', 'url', 'status', 'requestBody', 'requestHeaders', 'responseBody', 'responseHeaders', 'duration'] } = { ...defaultConfig, ...config };
 
     const method = requestDetails.method || 'GET';
     const url = typeof requestDetails === 'string' ? requestDetails : requestDetails.url;
