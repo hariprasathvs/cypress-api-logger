@@ -1,6 +1,6 @@
 {
   "name": "cypress-api-logger",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Logs API Request and Response in Cypress Test Runner.",
   "main": "src/index.js",
   "scripts": {
