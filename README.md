@@ -56,11 +56,14 @@ You can set global configurations for the plugin using `Cypress.env('apiLoggerCo
   Controls the maximum number of lines displayed for the response body.  
 
     - **`displayFields`**:  
-  `['method', 'url', 'status', 'requestBody', 'requestHeaders', 'responseBody', 'responseHeaders', 'duration']`  
+  `['method', 'url', 'status', 'requestBody', 'requestHeaders', 'responseBody', 'responseHeaders', 'duration', 'graphqlQuery']`  
   Specifies which fields should be displayed in the logs.  
 
     - **`enableApiLogging`**: `true`  
   Toggles API logging. When set to `false`, no logs will be displayed.  
+
+    - **`enableGraphQLLogging`**: `true`  
+  Toggles GrpahQL API logging. When set to `false`, no logs will be displayed.  
 
         #### Example Usage:  
 
@@ -71,6 +74,7 @@ You can set global configurations for the plugin using `Cypress.env('apiLoggerCo
           maxBodyLines: 100,
           displayFields: ['method', 'url', 'status'],
           enableApiLogging: false,
+          enableGraphQLLogging: true,
         });
         ```
 
