@@ -50,7 +50,7 @@ const logRequestDetails = (requestDetails, response, duration, config = {}) => {
         logMessage += ` | **Status**: ${response.status}\n`;
     }
 
-    if (displayFields.includes('requestHeaders') && requestHeaders) {
+    if (displayFields.includes('requestHeaders')) {
         logMessage += ` | **Request Headers**: ${JSON.stringify(requestHeaders, null, 2)}\n`;
     }
 
@@ -101,6 +101,9 @@ const logRequestDetails = (requestDetails, response, duration, config = {}) => {
     });
 };
 
+// Export for unit testing (webpack used by Cypress also defines module)
+module.exports = { logRequestDetails };
+
 // Overwrite the cy.request command
 Cypress.Commands.overwrite('request', (originalFn, ...args) => {
     const startTime = Date.now();
@@ -117,4 +120,60 @@ Cypress.Commands.overwrite('request', (originalFn, ...args) => {
         // Return the response
         return response;
     });
+});
+
+// Overwrite cy.intercept to automatically log matched requests/responses
+Cypress.Commands.overwrite('intercept', (originalFn, ...args) => {
+    const defaultConfig = Cypress.env('apiLoggerConfig') || {};
+    const { enableApiLogging = true } = defaultConfig;
+
+    if (!enableApiLogging) {
+        return originalFn(...args);
+    }
+
+    // Locate and wrap a routeHandler function if one was provided.
+    // cy.intercept signatures:
+    //   (url)
+    //   (method, url)
+    //   (routeMatcher)
+    //   (url, routeHandler)
+    //   (method, url, routeHandler)
+    //   (routeMatcher, routeHandler)
+    const lastArg = args[args.length - 1];
+    const hasHandler = typeof lastArg === 'function';
+
+    if (!hasHandler) {
+        return originalFn(...args);
+    }
+
+    const originalHandler = lastArg;
+
+    const wrappedHandler = (req) => {
+        const startTime = Date.now();
+
+        req.continue((res) => {
+            const duration = Date.now() - startTime;
+
+            const requestDetails = {
+                method: req.method,
+                url: req.url,
+                headers: req.headers,
+                body: req.body,
+            };
+
+            const response = {
+                status: res.statusCode,
+                headers: res.headers,
+                body: res.body,
+            };
+
+            logRequestDetails(requestDetails, response, duration);
+
+            // Call the original handler so the user's stub/spy still works
+            originalHandler(req);
+        });
+    };
+
+    const newArgs = [...args.slice(0, -1), wrappedHandler];
+    return originalFn(...newArgs);
 });

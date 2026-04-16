@@ -1,6 +1,31 @@
 # Cypress API Logger
 
+[![CI](https://github.com/hariprasathvs/cypress-api-logger/actions/workflows/ci.yml/badge.svg)](https://github.com/hariprasathvs/cypress-api-logger/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/cypress-api-logger.svg)](https://www.npmjs.com/package/cypress-api-logger)
+[![npm downloads](https://img.shields.io/npm/dm/cypress-api-logger.svg)](https://www.npmjs.com/package/cypress-api-logger)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 `cypress-api-logger` is a Cypress plugin that logs detailed information about API requests and responses directly in the Cypress Test Runner. This tool helps you monitor and debug API interactions efficiently during your test execution.
+
+## Preview
+
+> Add a screenshot or GIF here showing the Cypress Test Runner with the logger output. Example: drag a `.gif` into this repo and reference it below.
+
+```
+<!-- Replace this block with your screenshot -->
+<!-- ![cypress-api-logger preview](./docs/preview.gif) -->
+```
+
+**What you'll see in the Cypress Test Runner:**
+
+```
+LOGGER        --- LOGGING STARTED FOR GET : https://api.example.com/users
+              | Status: 200
+              | Request Headers: { "Content-Type": "application/json" }
+              | Response Body:
+              |   [{ "id": 1, "name": "Alice" }, ...]
+              | Duration: 142ms
+```
 
 ## Features
 
@@ -81,6 +106,23 @@ You can set global configurations for the plugin using `Cypress.env('apiLoggerCo
    
 2. **Per-Request Configuration**: 
    Users can also customize the logging behavior on a per-request basis by passing a `config` object inside the `cy.request()` options.
+
+## cy.intercept Support
+
+`cypress-api-logger` also automatically logs requests intercepted with `cy.intercept()` when you provide a route handler function.
+
+```javascript
+cy.intercept('GET', '/api/users', (req) => {
+  req.continue((res) => {
+    // your assertions here
+    expect(res.statusCode).to.eq(200);
+  });
+}).as('getUsers');
+```
+
+The logger will output the same structured log (method, URL, status, headers, body, duration) for intercepted requests — no extra setup required.
+
+> **Note:** Logging only activates when a handler function is provided. Static stubs (`cy.intercept('/api', { body: {} })`) are passed through unchanged.
 
 ## Contributing
 Feel free to contribute to this project! Fork the repository, create a new branch, and submit a pull request with your improvements.

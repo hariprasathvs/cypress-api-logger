@@ -11,6 +11,17 @@ describe('Custom cy.request Command', () => {
         });
     });
 
+    it('Logs intercepted requests and responses via cy.intercept', () => {
+        cy.intercept('GET', 'https://jsonplaceholder.typicode.com/posts/1', (req) => {
+            req.continue((res) => {
+                expect(res.statusCode).to.eq(200);
+            });
+        }).as('getPost');
+
+        cy.request('GET', 'https://jsonplaceholder.typicode.com/posts/1');
+        cy.wait('@getPost');
+    });
+
     it('should log GraphQL queries and responses for PokeAPI', () => {
         const query = `
             {
