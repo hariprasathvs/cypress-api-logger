@@ -170,38 +170,51 @@ describe('cy.intercept overwrite — no handler (pass-through)', () => {
 
 // ---------------------------------------------------------------------------
 // cy.intercept overwrite — I04: wrappedHandler execution
+//
+// New implementation wraps req.continue on the req object instead of calling
+// it directly, so originalHandler must call req.continue for logging to fire.
+// This avoids a double req.continue call (which would throw in Cypress because
+// the request is already resolved when the second call occurs).
 // ---------------------------------------------------------------------------
 
 describe('cy.intercept overwrite — wrappedHandler execution', () => {
     function buildMockReqRes() {
-        const mockRes = { statusCode: 201, headers: { 'content-type': 'application/json' }, body: { id: 99 } };
+        const mockRes     = { statusCode: 201, headers: { 'content-type': 'application/json' }, body: { id: 99 } };
+        // continueMock is saved before wrappedHandler replaces req.continue
+        const continueMock = jest.fn((cb) => cb(mockRes));
         const mockReq = {
             method: 'POST',
             url: '/api/items',
             headers: { 'content-type': 'application/json' },
             body: { name: 'New Item' },
-            continue: jest.fn((cb) => cb(mockRes)),
+            continue: continueMock,
         };
-        return { mockReq, mockRes };
+        return { mockReq, mockRes, continueMock };
     }
 
-    it('I04 — wrappedHandler calls req.continue', () => {
-        const originalFn = jest.fn();
-        const handler    = jest.fn();
+    // Helper: a handler that simulates what real user code does — calls req.continue
+    function handlerCallingContinue(responseHandler) {
+        return jest.fn((req) => { req.continue(responseHandler); });
+    }
+
+    it('I04 — wrappedHandler calls originalContinue (the real request) when handler invokes req.continue', () => {
+        const originalFn     = jest.fn();
+        const handler        = handlerCallingContinue();
 
         interceptOverwrite(originalFn, 'POST', '/api/items', handler);
 
-        const wrappedHandler = originalFn.mock.calls[0][2];
-        const { mockReq }    = buildMockReqRes();
+        const wrappedHandler     = originalFn.mock.calls[0][2];
+        const { mockReq, continueMock } = buildMockReqRes();
 
         wrappedHandler(mockReq);
 
-        expect(mockReq.continue).toHaveBeenCalled();
+        expect(continueMock).toHaveBeenCalled();
     });
 
-    it('I04 — wrappedHandler logs the intercepted request/response via Cypress.log', () => {
+    it('I04 — wrappedHandler logs request/response when handler calls req.continue without a responseHandler (branch: typeof responseHandler !== function)', () => {
         const originalFn = jest.fn();
-        const handler    = jest.fn();
+        // handler calls req.continue() with NO response handler
+        const handler    = handlerCallingContinue(undefined);
 
         interceptOverwrite(originalFn, 'POST', '/api/items', handler);
 
@@ -211,13 +224,28 @@ describe('cy.intercept overwrite — wrappedHandler execution', () => {
         wrappedHandler(mockReq);
 
         expect(Cypress.log).toHaveBeenCalled();
-        const logArg = Cypress.log.mock.calls[0][0];
-        expect(logArg.message).toContain('POST : /api/items');
+        expect(Cypress.log.mock.calls[0][0].message).toContain('POST : /api/items');
     });
 
-    it('I04 — wrappedHandler calls the original handler after logging', () => {
+    it('I04 — wrappedHandler logs AND calls the user responseHandler when handler calls req.continue with a responseHandler (branch: typeof responseHandler === function)', () => {
+        const originalFn     = jest.fn();
+        const responseHandler = jest.fn();
+        const handler        = handlerCallingContinue(responseHandler);
+
+        interceptOverwrite(originalFn, 'POST', '/api/items', handler);
+
+        const wrappedHandler     = originalFn.mock.calls[0][2];
+        const { mockReq, mockRes } = buildMockReqRes();
+
+        wrappedHandler(mockReq);
+
+        expect(Cypress.log).toHaveBeenCalled();
+        expect(responseHandler).toHaveBeenCalledWith(mockRes);
+    });
+
+    it('I04 — wrappedHandler calls the original handler with the modified req', () => {
         const originalFn = jest.fn();
-        const handler    = jest.fn();
+        const handler    = handlerCallingContinue();
 
         interceptOverwrite(originalFn, 'POST', '/api/items', handler);
 
@@ -229,9 +257,9 @@ describe('cy.intercept overwrite — wrappedHandler execution', () => {
         expect(handler).toHaveBeenCalledWith(mockReq);
     });
 
-    it('I04 — wrappedHandler builds request/response details from req and res objects', () => {
+    it('I04 — wrappedHandler extracts correct request and response details for consoleProps', () => {
         const originalFn = jest.fn();
-        const handler    = jest.fn();
+        const handler    = handlerCallingContinue();
 
         interceptOverwrite(originalFn, 'POST', '/api/items', handler);
 
@@ -246,15 +274,13 @@ describe('cy.intercept overwrite — wrappedHandler execution', () => {
         expect(props['Response Status']).toBe(201);
     });
 
-    it('I04 — wrappedHandler correctly replaces only the last arg with the wrapped handler', () => {
-        const originalFn   = jest.fn();
-        const handler      = jest.fn();
+    it('I04 — wrappedHandler correctly replaces only the last arg', () => {
+        const originalFn = jest.fn();
+        const handler    = handlerCallingContinue();
 
-        // Three-arg form: method, url, handler
         interceptOverwrite(originalFn, 'DELETE', '/api/items/1', handler);
 
         expect(originalFn).toHaveBeenCalledWith('DELETE', '/api/items/1', expect.any(Function));
-        // First two args preserved exactly
         expect(originalFn.mock.calls[0][0]).toBe('DELETE');
         expect(originalFn.mock.calls[0][1]).toBe('/api/items/1');
     });

@@ -150,28 +150,37 @@ Cypress.Commands.overwrite('intercept', (originalFn, ...args) => {
 
     const wrappedHandler = (req) => {
         const startTime = Date.now();
+        const originalContinue = req.continue.bind(req);
 
-        req.continue((res) => {
-            const duration = Date.now() - startTime;
+        // Replace req.continue on the req object so when originalHandler calls it,
+        // our wrapper intercepts the response to add logging — avoiding a double
+        // req.continue call which would throw because the request is already resolved.
+        req.continue = (responseHandler) => {
+            return originalContinue((res) => {
+                const duration = Date.now() - startTime;
 
-            const requestDetails = {
-                method: req.method,
-                url: req.url,
-                headers: req.headers,
-                body: req.body,
-            };
+                const requestDetails = {
+                    method: req.method,
+                    url: req.url,
+                    headers: req.headers,
+                    body: req.body,
+                };
 
-            const response = {
-                status: res.statusCode,
-                headers: res.headers,
-                body: res.body,
-            };
+                const response = {
+                    status: res.statusCode,
+                    headers: res.headers,
+                    body: res.body,
+                };
 
-            logRequestDetails(requestDetails, response, duration);
+                logRequestDetails(requestDetails, response, duration);
 
-            // Call the original handler so the user's stub/spy still works
-            originalHandler(req);
-        });
+                if (typeof responseHandler === 'function') {
+                    responseHandler(res);
+                }
+            });
+        };
+
+        originalHandler(req);
     };
 
     const newArgs = [...args.slice(0, -1), wrappedHandler];
