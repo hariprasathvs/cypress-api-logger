@@ -1,0 +1,15 @@
+# Test files
+__tests__/
+coverage/
+
+# Cypress E2E tests and config
+cypress/
+cypress.config.js
+
+# CI and tooling
+.github/
+.claude/
+
+# Local dev
+node_modules/
+*.log

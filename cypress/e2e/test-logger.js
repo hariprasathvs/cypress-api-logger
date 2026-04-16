@@ -12,13 +12,19 @@ describe('Custom cy.request Command', () => {
     });
 
     it('Logs intercepted requests and responses via cy.intercept', () => {
+        // cy.intercept only intercepts browser-level requests (fetch/XHR), not cy.request
+        // which runs in Cypress's Node.js backend. Use cy.window().fetch() to trigger
+        // a real browser request so the intercept alias fires correctly.
         cy.intercept('GET', 'https://jsonplaceholder.typicode.com/posts/1', (req) => {
             req.continue((res) => {
                 expect(res.statusCode).to.eq(200);
             });
         }).as('getPost');
 
-        cy.request('GET', 'https://jsonplaceholder.typicode.com/posts/1');
+        cy.visit('about:blank');
+        cy.window().then((win) => {
+            return win.fetch('https://jsonplaceholder.typicode.com/posts/1');
+        });
         cy.wait('@getPost');
     });
 
