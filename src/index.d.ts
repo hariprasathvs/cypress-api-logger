@@ -45,6 +45,29 @@ export interface ApiLoggerConfig {
    * @default ['query', 'variables', 'responseBody']
    */
   graphQLFields?: Array<'query' | 'variables' | 'responseBody'>;
+
+  /**
+   * URL patterns to exclude from logging. Supports exact substrings and
+   * wildcards (`*`). Matched requests are silently skipped.
+   * @example ['/health', '/analytics', '*.cdn.com']
+   * @default []
+   */
+  excludeUrls?: string[];
+
+  /**
+   * When true, only requests with a response status >= 400 are logged.
+   * Useful in CI to reduce noise and focus on failures.
+   * @default false
+   */
+  logOnlyFailures?: boolean;
+
+  /**
+   * Header and body field names to redact. Matching is case-insensitive.
+   * Matched values are replaced with `'***MASKED***'` in the log output.
+   * @example ['authorization', 'x-api-key', 'password']
+   * @default []
+   */
+  maskFields?: string[];
 }
 
 declare global {

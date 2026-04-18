@@ -9,13 +9,6 @@
 
 ## Preview
 
-> Add a screenshot or GIF here showing the Cypress Test Runner with the logger output. Example: drag a `.gif` into this repo and reference it below.
-
-```
-<!-- Replace this block with your screenshot -->
-<!-- ![cypress-api-logger preview](./docs/preview.gif) -->
-```
-
 **What you'll see in the Cypress Test Runner:**
 
 ```
@@ -27,12 +20,19 @@ LOGGER        --- LOGGING STARTED FOR GET : https://api.example.com/users
               | Duration: 142ms
 ```
 
+> To add a screenshot or GIF: record your Cypress run, save the file under `docs/preview.gif`, and add `![preview](./docs/preview.gif)` above the code block.
+
 ## Features
 
 - Logs HTTP request details: method, URL, headers, body, etc.
 - Logs HTTP response details: status, headers, body, duration, etc.
 - Easy integration into existing Cypress projects.
 - Provides visibility into API interactions, helping to identify issues faster.
+- GraphQL support: auto-detects and logs queries, variables, and responses.
+- `cy.intercept` support: logs browser-level intercepted requests automatically.
+- **Exclude URLs** from logging via substring or wildcard patterns.
+- **Log only failures** — reduce noise in CI by logging only status ≥ 400.
+- **Mask sensitive fields** — redact tokens, passwords, and API keys from logs.
 
 ## Installation
 
@@ -88,7 +88,7 @@ You can set global configurations for the plugin using `Cypress.env('apiLoggerCo
   Toggles API logging. When set to `false`, no logs will be displayed.  
 
     - **`enableGraphQLLogging`**: `true`  
-  Toggles GrpahQL API logging. When set to `false`, no logs will be displayed.  
+  Toggles GraphQL API logging. When set to `false`, no logs will be displayed.  
 
         #### Example Usage:  
 
@@ -103,8 +103,34 @@ You can set global configurations for the plugin using `Cypress.env('apiLoggerCo
         });
         ```
 
-   
-2. **Per-Request Configuration**: 
+    - **`excludeUrls`**: `[]`  
+  Array of URL patterns to skip logging. Supports exact substrings and `*` wildcards. Useful for ignoring health checks, analytics, or CDN requests.
+
+        ```javascript
+        Cypress.env('apiLoggerConfig', {
+          excludeUrls: ['/health', '/analytics', '*.cdn.com*'],
+        });
+        ```
+
+    - **`logOnlyFailures`**: `false`  
+  When `true`, only requests with a response status `>= 400` are logged. Ideal for CI pipelines where you only care about what broke.
+
+        ```javascript
+        Cypress.env('apiLoggerConfig', {
+          logOnlyFailures: true,
+        });
+        ```
+
+    - **`maskFields`**: `[]`  
+  Array of header and body field names to redact. Matching is case-insensitive. Matched values are replaced with `***MASKED***` in the log output — keeps tokens and passwords out of your test logs.
+
+        ```javascript
+        Cypress.env('apiLoggerConfig', {
+          maskFields: ['authorization', 'x-api-key', 'password'],
+        });
+        ```
+
+2. **Per-Request Configuration**:
    Users can also customize the logging behavior on a per-request basis by passing a `config` object inside the `cy.request()` options.
 
 ## cy.intercept Support
