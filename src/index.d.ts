@@ -68,6 +68,49 @@ export interface ApiLoggerConfig {
    * @default []
    */
   maskFields?: string[];
+
+  /**
+   * URL allowlist. When set, only requests whose URL matches at least one
+   * pattern are logged — everything else is silently skipped.
+   * Supports exact substrings and `*` wildcards.
+   * @example ['/api/payments', '/api/orders']
+   * @default []
+   */
+  includeUrls?: string[];
+
+  /**
+   * Duration threshold in milliseconds. Requests that exceed this value are
+   * flagged with a `⚠ SLOW` indicator in the Cypress log and `displayName`.
+   * Set to `null` to disable (default).
+   * @example 1000
+   * @default null
+   */
+  slowThreshold?: number | null;
+
+  /**
+   * Custom callback fired after every logged request. Receives the full
+   * (masked) log data — use it to pipe logs to Slack, Datadog, a file, or
+   * any external reporter.
+   * @example (data) => { if (data.status >= 400) notifySlack(data); }
+   * @default null
+   */
+  onLog?: (data: ApiLogData) => void;
+}
+
+/**
+ * The data object passed to the `onLog` callback on every logged request.
+ */
+export interface ApiLogData {
+  method: string;
+  url: string;
+  status: number;
+  duration: number;
+  requestBody: Record<string, unknown> | null;
+  requestHeaders: Record<string, unknown>;
+  responseBody: Record<string, unknown> | unknown[] | null;
+  responseHeaders: Record<string, unknown> | null;
+  isGraphQL: boolean;
+  isSlow: boolean;
 }
 
 declare global {

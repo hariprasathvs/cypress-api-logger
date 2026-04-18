@@ -24,7 +24,7 @@
  */
 
 let maskSensitiveData;
-let isUrlExcluded;
+let isUrlMatch;
 let logRequestDetails;
 
 beforeEach(() => {
@@ -34,7 +34,7 @@ beforeEach(() => {
         log: jest.fn(),
         Commands: { overwrite: jest.fn() },
     };
-    ({ maskSensitiveData, isUrlExcluded, logRequestDetails } = require('../src/logger'));
+    ({ maskSensitiveData, isUrlMatch, logRequestDetails } = require('../src/logger'));
 });
 
 afterEach(() => {
@@ -115,36 +115,36 @@ describe('maskSensitiveData', () => {
 });
 
 // ---------------------------------------------------------------------------
-// isUrlExcluded
+// isUrlMatch (used by both excludeUrls and includeUrls)
 // ---------------------------------------------------------------------------
 
-describe('isUrlExcluded', () => {
+describe('isUrlMatch', () => {
     describe('U01 / U02 — wildcard patterns', () => {
         it('returns true when wildcard pattern matches the URL', () => {
-            expect(isUrlExcluded('https://assets.cdn.com/logo.png', ['*.cdn.com*'])).toBe(true);
+            expect(isUrlMatch('https://assets.cdn.com/logo.png', ['*.cdn.com*'])).toBe(true);
         });
 
         it('returns false when wildcard pattern does not match the URL', () => {
-            expect(isUrlExcluded('https://api.example.com/users', ['*.cdn.com*'])).toBe(false);
+            expect(isUrlMatch('https://api.example.com/users', ['*.cdn.com*'])).toBe(false);
         });
     });
 
     describe('U01 / U03 — substring patterns', () => {
         it('returns true when substring pattern is found in the URL', () => {
-            expect(isUrlExcluded('/api/health', ['/health'])).toBe(true);
+            expect(isUrlMatch('/api/health', ['/health'])).toBe(true);
         });
 
         it('returns false when substring pattern is not in the URL', () => {
-            expect(isUrlExcluded('/api/users', ['/health'])).toBe(false);
+            expect(isUrlMatch('/api/users', ['/health'])).toBe(false);
         });
     });
 
-    it('returns false for an empty excludeUrls list', () => {
-        expect(isUrlExcluded('/api/users', [])).toBe(false);
+    it('returns false for an empty patterns list', () => {
+        expect(isUrlMatch('/api/users', [])).toBe(false);
     });
 
     it('returns true when any one of multiple patterns matches', () => {
-        expect(isUrlExcluded('/api/analytics', ['/health', '/analytics'])).toBe(true);
+        expect(isUrlMatch('/api/analytics', ['/health', '/analytics'])).toBe(true);
     });
 });
 
@@ -177,6 +177,44 @@ describe('L01 — excludeUrls filtering', () => {
             REST_RESPONSE,
             100,
         );
+        expect(Cypress.log).not.toHaveBeenCalled();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// logRequestDetails — L01b: includeUrls (allowlist)
+// ---------------------------------------------------------------------------
+
+describe('L01b — includeUrls allowlist', () => {
+    it('logs normally when includeUrls is empty (default — log everything)', () => {
+        logRequestDetails(REST_REQUEST, REST_RESPONSE, 100);
+        expect(Cypress.log).toHaveBeenCalled();
+    });
+
+    it('logs when URL matches an includeUrls pattern', () => {
+        global.Cypress.env.mockReturnValue({ includeUrls: ['/api/users'] });
+        logRequestDetails(REST_REQUEST, REST_RESPONSE, 100);
+        expect(Cypress.log).toHaveBeenCalled();
+    });
+
+    it('skips logging when URL does not match any includeUrls pattern', () => {
+        global.Cypress.env.mockReturnValue({ includeUrls: ['/api/payments'] });
+        logRequestDetails(REST_REQUEST, REST_RESPONSE, 100);
+        expect(Cypress.log).not.toHaveBeenCalled();
+    });
+
+    it('logs when URL matches a wildcard includeUrls pattern', () => {
+        global.Cypress.env.mockReturnValue({ includeUrls: ['/api/*'] });
+        logRequestDetails(REST_REQUEST, REST_RESPONSE, 100);
+        expect(Cypress.log).toHaveBeenCalled();
+    });
+
+    it('excludeUrls takes priority over includeUrls when both are set', () => {
+        global.Cypress.env.mockReturnValue({
+            excludeUrls: ['/api/users'],
+            includeUrls: ['/api/users'],
+        });
+        logRequestDetails(REST_REQUEST, REST_RESPONSE, 100);
         expect(Cypress.log).not.toHaveBeenCalled();
     });
 });
@@ -280,5 +318,111 @@ describe('L03 — maskFields redaction', () => {
         logRequestDetails(req, { status: 200, body: { data: {} }, headers: {} }, 100);
         const msg = Cypress.log.mock.calls[0][0].message;
         expect(msg).toContain('***MASKED***');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// logRequestDetails — slowThreshold
+// ---------------------------------------------------------------------------
+
+describe('slowThreshold — performance flagging', () => {
+    it('does not flag as slow when slowThreshold is null (default)', () => {
+        logRequestDetails(REST_REQUEST, REST_RESPONSE, 2000);
+        const arg = Cypress.log.mock.calls[0][0];
+        expect(arg.displayName).toBe('LOGGER');
+        expect(arg.message).not.toContain('SLOW REQUEST');
+    });
+
+    it('does not flag as slow when duration is within threshold', () => {
+        global.Cypress.env.mockReturnValue({ slowThreshold: 1000 });
+        logRequestDetails(REST_REQUEST, REST_RESPONSE, 500);
+        const arg = Cypress.log.mock.calls[0][0];
+        expect(arg.displayName).toBe('LOGGER');
+        expect(arg.message).not.toContain('SLOW REQUEST');
+    });
+
+    it('flags as slow and updates displayName when duration exceeds threshold', () => {
+        global.Cypress.env.mockReturnValue({ slowThreshold: 1000 });
+        logRequestDetails(REST_REQUEST, REST_RESPONSE, 2000);
+        const arg = Cypress.log.mock.calls[0][0];
+        expect(arg.displayName).toBe('⚠ SLOW LOGGER');
+        expect(arg.message).toContain('⚠ **SLOW REQUEST**');
+        expect(arg.message).toContain('2000ms exceeded 1000ms threshold');
+    });
+
+    it('uses ⚠ SLOW GRAPHQL displayName for slow GraphQL requests', () => {
+        global.Cypress.env.mockReturnValue({ slowThreshold: 500 });
+        const req = { method: 'POST', url: '/graphql', body: { query: '{ users { id } }' } };
+        logRequestDetails(req, { status: 200, body: { data: {} }, headers: {} }, 1500);
+        const arg = Cypress.log.mock.calls[0][0];
+        expect(arg.displayName).toBe('⚠ SLOW GRAPHQL');
+    });
+
+    it('sets isSlow: false in consoleProps for fast requests', () => {
+        global.Cypress.env.mockReturnValue({ slowThreshold: 1000 });
+        logRequestDetails(REST_REQUEST, REST_RESPONSE, 100);
+        const props = Cypress.log.mock.calls[0][0].consoleProps();
+        expect(props['Slow Request']).toBe(false);
+    });
+
+    it('sets isSlow: true in consoleProps for slow requests', () => {
+        global.Cypress.env.mockReturnValue({ slowThreshold: 1000 });
+        logRequestDetails(REST_REQUEST, REST_RESPONSE, 2000);
+        const props = Cypress.log.mock.calls[0][0].consoleProps();
+        expect(props['Slow Request']).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// logRequestDetails — onLog callback
+// ---------------------------------------------------------------------------
+
+describe('onLog — custom log callback', () => {
+    it('does not throw when onLog is null (default)', () => {
+        expect(() => logRequestDetails(REST_REQUEST, REST_RESPONSE, 100)).not.toThrow();
+    });
+
+    it('calls onLog with the full log data object after logging', () => {
+        const onLog = jest.fn();
+        global.Cypress.env.mockReturnValue({ onLog });
+        logRequestDetails(REST_REQUEST, REST_RESPONSE, 150);
+        expect(onLog).toHaveBeenCalledTimes(1);
+        const data = onLog.mock.calls[0][0];
+        expect(data.method).toBe('GET');
+        expect(data.url).toBe('/api/users');
+        expect(data.status).toBe(200);
+        expect(data.duration).toBe(150);
+        expect(data.isGraphQL).toBeFalsy();
+    });
+
+    it('passes isSlow: true to onLog when request exceeds slowThreshold', () => {
+        const onLog = jest.fn();
+        global.Cypress.env.mockReturnValue({ onLog, slowThreshold: 100 });
+        logRequestDetails(REST_REQUEST, REST_RESPONSE, 500);
+        expect(onLog.mock.calls[0][0].isSlow).toBe(true);
+    });
+
+    it('passes isSlow: false to onLog when request is within slowThreshold', () => {
+        const onLog = jest.fn();
+        global.Cypress.env.mockReturnValue({ onLog, slowThreshold: 1000 });
+        logRequestDetails(REST_REQUEST, REST_RESPONSE, 100);
+        expect(onLog.mock.calls[0][0].isSlow).toBe(false);
+    });
+
+    it('passes masked request and response data to onLog', () => {
+        const onLog = jest.fn();
+        global.Cypress.env.mockReturnValue({ onLog, maskFields: ['authorization'] });
+        const req = { method: 'GET', url: '/api/users', headers: { Authorization: 'Bearer secret' } };
+        logRequestDetails(req, REST_RESPONSE, 100);
+        const data = onLog.mock.calls[0][0];
+        expect(data.requestHeaders.Authorization).toBe('***MASKED***');
+    });
+
+    it('passes isGraphQL: true to onLog for GraphQL requests', () => {
+        const onLog = jest.fn();
+        global.Cypress.env.mockReturnValue({ onLog });
+        const req = { method: 'POST', url: '/graphql', body: { query: '{ users { id } }' } };
+        logRequestDetails(req, { status: 200, body: { data: {} }, headers: {} }, 100);
+        expect(onLog.mock.calls[0][0].isGraphQL).toBe(true);
     });
 });

@@ -4,6 +4,19 @@ All notable changes to `cypress-api-logger` are documented here.
 
 ---
 
+## [1.3.3] - 2026-04-18
+
+### Added
+- **`includeUrls`** config option — URL allowlist, the complement to `excludeUrls`. When set, only requests matching at least one pattern are logged. Supports substrings and `*` wildcards.
+- **`slowThreshold`** config option — flags requests that exceed the configured duration (ms) with a `⚠ SLOW` indicator in the Cypress log `displayName` and log message body.
+- **`onLog`** config option — custom callback fired after every logged request with the full (masked) log data object (`method`, `url`, `status`, `duration`, `requestBody`, `requestHeaders`, `responseBody`, `responseHeaders`, `isGraphQL`, `isSlow`). Enables piping logs to Slack, Datadog, custom reporters, or files.
+
+### Improved
+- TypeScript definitions updated: new `ApiLogData` interface exported for use in `onLog` callback typing; new config options documented with JSDoc.
+- Unit test suite expanded to 115 tests, maintaining 100% statement and branch coverage.
+
+---
+
 ## [1.3.2] - 2026-04-18
 
 ### Added

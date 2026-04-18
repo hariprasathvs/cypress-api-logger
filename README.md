@@ -20,7 +20,6 @@ LOGGER        --- LOGGING STARTED FOR GET : https://api.example.com/users
               | Duration: 142ms
 ```
 
-> To add a screenshot or GIF: record your Cypress run, save the file under `docs/preview.gif`, and add `![preview](./docs/preview.gif)` above the code block.
 
 ## Features
 
@@ -31,8 +30,11 @@ LOGGER        --- LOGGING STARTED FOR GET : https://api.example.com/users
 - GraphQL support: auto-detects and logs queries, variables, and responses.
 - `cy.intercept` support: logs browser-level intercepted requests automatically.
 - **Exclude URLs** from logging via substring or wildcard patterns.
+- **Include URLs** (allowlist) — log only the services you care about.
 - **Log only failures** — reduce noise in CI by logging only status ≥ 400.
 - **Mask sensitive fields** — redact tokens, passwords, and API keys from logs.
+- **Slow request detection** — flag requests that exceed a configurable threshold.
+- **`onLog` callback** — pipe log data to Slack, Datadog, or any external reporter.
 
 ## Installation
 
@@ -127,6 +129,40 @@ You can set global configurations for the plugin using `Cypress.env('apiLoggerCo
         ```javascript
         Cypress.env('apiLoggerConfig', {
           maskFields: ['authorization', 'x-api-key', 'password'],
+        });
+        ```
+
+    - **`includeUrls`**: `[]`  
+  URL allowlist — the opposite of `excludeUrls`. When set, only requests matching at least one pattern are logged. Everything else is silently skipped. Supports substrings and `*` wildcards.
+
+        ```javascript
+        Cypress.env('apiLoggerConfig', {
+          includeUrls: ['/api/payments', '/api/orders'],
+        });
+        ```
+
+    - **`slowThreshold`**: `null`  
+  Duration threshold in milliseconds. Requests that exceed it are flagged with a `⚠ SLOW` indicator in the Cypress log display name and log message. Set to `null` (default) to disable.
+
+        ```javascript
+        Cypress.env('apiLoggerConfig', {
+          slowThreshold: 1000,  // flag requests slower than 1 second
+        });
+        ```
+
+    - **`onLog`**: `null`  
+  Custom callback fired after every logged request. Receives the full (masked) log data object. Use it to pipe logs to Slack, Datadog, a file, or any external reporter.
+
+        ```javascript
+        Cypress.env('apiLoggerConfig', {
+          onLog: (data) => {
+            // data: { method, url, status, duration, requestBody,
+            //         requestHeaders, responseBody, responseHeaders,
+            //         isGraphQL, isSlow }
+            if (data.status >= 400) {
+              cy.task('sendSlackAlert', data);
+            }
+          },
         });
         ```
 

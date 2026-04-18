@@ -12,8 +12,10 @@ const maskSensitiveData = (obj, maskFields) => {
     return result;
 };
 
-const isUrlExcluded = (url, excludeUrls) => {
-    return excludeUrls.some((pattern) => {
+// Checks whether a URL matches any pattern in the list.
+// Used by both excludeUrls (skip if matched) and includeUrls (skip if NOT matched).
+const isUrlMatch = (url, patterns) => {
+    return patterns.some((pattern) => {
         if (pattern.includes('*')) {
             return new RegExp(pattern.replace(/\*/g, '.*')).test(url);
         }
@@ -41,8 +43,11 @@ const logRequestDetails = (requestDetails, response, duration, config = {}) => {
         enableGraphQLLogging = true,
         graphQLFields = ['query', 'variables', 'responseBody'],
         excludeUrls = [],
+        includeUrls = [],
         logOnlyFailures = false,
         maskFields = [],
+        slowThreshold = null,
+        onLog = null,
     } = { ...defaultConfig, ...config };
 
     if (!enableApiLogging) {
@@ -52,7 +57,11 @@ const logRequestDetails = (requestDetails, response, duration, config = {}) => {
     const method = requestDetails.method || 'GET';
     const url = typeof requestDetails === 'string' ? requestDetails : requestDetails.url;
 
-    if (excludeUrls.length > 0 && isUrlExcluded(url, excludeUrls)) {
+    if (excludeUrls.length > 0 && isUrlMatch(url, excludeUrls)) {
+        return;
+    }
+
+    if (includeUrls.length > 0 && !isUrlMatch(url, includeUrls)) {
         return;
     }
 
@@ -63,10 +72,10 @@ const logRequestDetails = (requestDetails, response, duration, config = {}) => {
     const requestBody = requestDetails.body || null;
     const requestHeaders = requestDetails.headers || {};
 
-    const maskedRequestHeaders = maskSensitiveData(requestHeaders, maskFields);
-    const maskedRequestBody    = maskSensitiveData(requestBody, maskFields);
+    const maskedRequestHeaders  = maskSensitiveData(requestHeaders, maskFields);
+    const maskedRequestBody     = maskSensitiveData(requestBody, maskFields);
     const maskedResponseHeaders = maskSensitiveData(response.headers, maskFields);
-    const maskedResponseBody   = response.body ? maskSensitiveData(response.body, maskFields) : null;
+    const maskedResponseBody    = response.body ? maskSensitiveData(response.body, maskFields) : null;
 
     const truncatedResponseBody = maskedResponseBody
         ? JSON.stringify(maskedResponseBody, null, 2).split('\n').slice(0, maxBodyLines).join('\n')
@@ -80,6 +89,8 @@ const logRequestDetails = (requestDetails, response, duration, config = {}) => {
         console.log('GraphQL logging is disabled. Skipping logging for this request.');
         return;
     }
+
+    const isSlow = slowThreshold !== null && duration > slowThreshold;
 
     let logMessage = `--- **LOGGING STARTED FOR** ${method} : ${url} \n`;
 
@@ -119,9 +130,15 @@ const logRequestDetails = (requestDetails, response, duration, config = {}) => {
         logMessage += ` | **Duration**: ${duration}ms\n`;
     }
 
+    if (isSlow) {
+        logMessage += ` | ⚠ **SLOW REQUEST**: ${duration}ms exceeded ${slowThreshold}ms threshold\n`;
+    }
+
     Cypress.log({
         name: isGraphQL ? 'GraphQL Log' : 'Custom Log',
-        displayName: isGraphQL ? 'GRAPHQL LOGGER' : 'LOGGER',
+        displayName: isSlow
+            ? (isGraphQL ? '⚠ SLOW GRAPHQL' : '⚠ SLOW LOGGER')
+            : (isGraphQL ? 'GRAPHQL LOGGER' : 'LOGGER'),
         message: logMessage,
         consoleProps: () => ({
             'Request Method': method,
@@ -134,12 +151,28 @@ const logRequestDetails = (requestDetails, response, duration, config = {}) => {
             'Response Body': truncatedResponseBody,
             'Response Headers': JSON.stringify(maskedResponseHeaders, null, 2),
             'Duration (ms)': duration,
+            'Slow Request': isSlow,
         }),
     });
+
+    if (typeof onLog === 'function') {
+        onLog({
+            method,
+            url,
+            status: response.status,
+            duration,
+            requestBody: maskedRequestBody,
+            requestHeaders: maskedRequestHeaders,
+            responseBody: maskedResponseBody,
+            responseHeaders: maskedResponseHeaders,
+            isGraphQL,
+            isSlow,
+        });
+    }
 };
 
 // Export for unit testing (webpack used by Cypress also defines module)
-module.exports = { logRequestDetails, maskSensitiveData, isUrlExcluded };
+module.exports = { logRequestDetails, maskSensitiveData, isUrlMatch };
 
 // Overwrite the cy.request command
 Cypress.Commands.overwrite('request', (originalFn, ...args) => {
